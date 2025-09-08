@@ -8,3 +8,8 @@
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
 # Add any project specific keep options here:
+-keep class com.abc.terminalfactory.** { *; }
+-keep class javax.smartcardio.** { *; }
+-keep class com.smartcardpoc.** { *; }
+-dontwarn com.abc.terminalfactory.**
+-dontwarn javax.smartcardio.**
