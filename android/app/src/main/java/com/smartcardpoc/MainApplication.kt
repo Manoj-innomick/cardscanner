@@ -33,9 +33,23 @@ class MainApplication : Application(), ReactApplication {
 
         override fun getJSMainModuleName(): String = "index"
     }
+    
 
     override fun onCreate() {
         super.onCreate()
         SoLoader.init(this, false)
+    }
+
+    // Override onBackPressed for the activity
+    override fun onBackPressed() {
+        val reactContext = mReactNativeHost.reactInstanceManager.currentReactContext
+        if (reactContext != null) {
+            val uiManager = reactContext.getNativeModule(UIManagerModule::class.java)
+            if (uiManager != null && !uiManager.onBackPressed()) {
+                super.onBackPressed()
+            }
+        } else {
+            super.onBackPressed()
+        }
     }
 }

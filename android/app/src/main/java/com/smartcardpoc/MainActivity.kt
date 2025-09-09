@@ -19,4 +19,18 @@ class MainActivity : ReactActivity() {
    */
   override fun createReactActivityDelegate(): ReactActivityDelegate =
       DefaultReactActivityDelegate(this, mainComponentName, fabricEnabled)
+
+override fun getMainComponentName(): String = "smartcardpoc"
+
+      override fun onBackPressed() {
+        val reactContext = reactInstanceManager.currentReactContext
+        if (reactContext != null) {
+            val uiManager = reactContext.getNativeModule(UIManagerModule::class.java)
+            if (uiManager != null && !uiManager.onBackPressed()) {
+                super.onBackPressed()
+            }
+        } else {
+            super.onBackPressed()
+        }
+    }
 }
