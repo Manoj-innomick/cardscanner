@@ -29,8 +29,25 @@ public class CprScanner {
         this.context = context;
         this.reactContext = reactContext;
 
-        if (UsbSmartCard.getInstance(context).manager == null) {
-            updateStatus("USB Host not supported on this device.");
+        android.util.Log.d("CprScanner", "Scanner initializing...");
+        updateStatus("Scanner initialization started.");
+        try {
+            UsbSmartCard usbSmartCard = UsbSmartCard.getInstance(context);
+            if (usbSmartCard == null) {
+                android.util.Log.e("CprScanner", "USB SmartCard instance is null");
+                updateStatus("USB Host not supported or not initialized.");
+            } else {
+                List<CardTerminal> terminals = usbSmartCard.terminals().list();
+                if (terminals == null || terminals.isEmpty()) {
+                    android.util.Log.e("CprScanner", "No card terminals detected");
+                    updateStatus("USB Host not supported or no terminals detected.");
+                } else {
+                    android.util.Log.d("CprScanner", "USB Host supported with " + terminals.size() + " terminals");
+                }
+            }
+        } catch (Exception e) {
+            android.util.Log.e("CprScanner", "Error checking USB host: " + e.getMessage());
+            updateStatus("USB Host check failed: " + e.getMessage());
         }
     }
 
@@ -89,68 +106,22 @@ public class CprScanner {
             }
 
             ByteArrayOutputStream allData = new ByteArrayOutputStream();
-
-            ByteArrayOutputStream readFileInChunks(String fileId, String directoryId) {
-                ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-                try {
-                    updateStatus("Selecting Directory " + directoryId + "...");
-                    String selectDfCommand = "00A4000C02" + directoryId;
-                    byte[] dfResponse = sdkWrapper.transmit(selectDfCommand);
-                    if (!isSuccess(dfResponse)) {
-                        updateStatus("Warning: Could not select directory " + directoryId + ". Skipping.");
-                        return outputStream;
-                    }
-
-                    updateStatus("Selecting File " + fileId + "...");
-                    String selectFileCommand = "00A4020C02" + fileId;
-                    byte[] fileResponse = sdkWrapper.transmit(selectFileCommand);
-                    if (!isSuccess(fileResponse)) {
-                        updateStatus("Warning: Could not select file " + fileId + " in dir " + directoryId + ". Skipping.");
-                        return outputStream;
-                    }
-
-                    int offset = 0;
-                    int chunkSize = 255;
-                    while (true) {
-                        int p1 = (offset >> 8) & 0xFF;
-                        int p2 = offset & 0xFF;
-                        String readFileCommand = String.format("00B0%02X%02X%02X", p1, p2, chunkSize);
-
-                        byte[] readResponse = sdkWrapper.transmit(readFileCommand);
-
-                        if (readResponse != null && readResponse.length > 2) {
-                            byte[] dataChunk = new byte[readResponse.length - 2];
-                            System.arraycopy(readResponse, 0, dataChunk, 0, dataChunk.length);
-                            if (dataChunk.length == 0) break;
-                            outputStream.write(dataChunk, 0, dataChunk.length);
-                            offset += dataChunk.length;
-                            if (dataChunk.length < chunkSize) break;
-                        } else {
-                            break;
-                        }
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-                return outputStream;
-            }
-
-            updateStatus("Reading Personal Data (0101/0001)...");
             allData.write(readFileInChunks("0001", "0101").toByteArray());
-            updateStatus("Reading Address Data (0102/0002)...");
+            updateStatus("Reading Personal Data (0101/0001)...");
             allData.write(readFileInChunks("0002", "0102").toByteArray());
-            updateStatus("Reading Photo Data (0103/0003)...");
+            updateStatus("Reading Address Data (0102/0002)...");
             allData.write(readFileInChunks("0003", "0103").toByteArray());
-            updateStatus("Reading Signature Data (0104/0004)...");
+            updateStatus("Reading Photo Data (0103/0003)...");
             allData.write(readFileInChunks("0004", "0104").toByteArray());
-            updateStatus("Reading Fingerprint 1 (0105/0001)...");
+            updateStatus("Reading Signature Data (0104/0004)...");
             allData.write(readFileInChunks("0001", "0105").toByteArray());
-            updateStatus("Reading Fingerprint 2 (0105/0002)...");
+            updateStatus("Reading Fingerprint 1 (0105/0001)...");
             allData.write(readFileInChunks("0002", "0105").toByteArray());
-            updateStatus("Reading Visa/Permit Data (0106/0005)...");
+            updateStatus("Reading Fingerprint 2 (0105/0002)...");
             allData.write(readFileInChunks("0005", "0106").toByteArray());
-            updateStatus("Reading Employment Data (0107/0006)...");
+            updateStatus("Reading Visa/Permit Data (0106/0005)...");
             allData.write(readFileInChunks("0006", "0107").toByteArray());
+            updateStatus("Reading Employment Data (0107/0006)...");
 
             byte[] completeData = allData.toByteArray();
             if (completeData.length == 0) {
@@ -165,27 +136,72 @@ public class CprScanner {
         }
     }
 
+    private ByteArrayOutputStream readFileInChunks(String fileId, String directoryId) {
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        try {
+            updateStatus("Selecting Directory " + directoryId + "...");
+            String selectDfCommand = "00A4000C02" + directoryId;
+            byte[] dfResponse = sdkWrapper.transmit(selectDfCommand);
+            if (!isSuccess(dfResponse)) {
+                updateStatus("Warning: Could not select directory " + directoryId + ". Skipping.");
+                return outputStream;
+            }
+
+            updateStatus("Selecting File " + fileId + "...");
+            String selectFileCommand = "00A4020C02" + fileId;
+            byte[] fileResponse = sdkWrapper.transmit(selectFileCommand);
+            if (!isSuccess(fileResponse)) {
+                updateStatus("Warning: Could not select file " + fileId + " in dir " + directoryId + ". Skipping.");
+                return outputStream;
+            }
+
+            int offset = 0;
+            int chunkSize = 255;
+            while (true) {
+                int p1 = (offset >> 8) & 0xFF;
+                int p2 = offset & 0xFF;
+                String readFileCommand = String.format("00B0%02X%02X%02X", p1, p2, chunkSize);
+
+                byte[] readResponse = sdkWrapper.transmit(readFileCommand);
+
+                if (readResponse != null && readResponse.length > 2) {
+                    byte[] dataChunk = new byte[readResponse.length - 2];
+                    System.arraycopy(readResponse, 0, dataChunk, 0, dataChunk.length);
+                    if (dataChunk.length == 0) break;
+                    outputStream.write(dataChunk, 0, dataChunk.length);
+                    offset += dataChunk.length;
+                    if (dataChunk.length < chunkSize) break;
+                } else {
+                    break;
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return outputStream;
+    }
+
+    private String getField(byte[] data, int start, int length) {
+        if (start + length > data.length) return "";
+        byte[] fieldBytes = new byte[length];
+        System.arraycopy(data, start, fieldBytes, 0, length);
+        String field = new String(fieldBytes, StandardCharsets.UTF_8);
+        return field.replaceAll("\\p{C}", "").trim();
+    }
+
+    private String getRemainingField(byte[] data, int start) {
+        if (start >= data.length) return "";
+        byte[] remainingBytes = new byte[data.length - start];
+        System.arraycopy(data, start, remainingBytes, 0, remainingBytes.length);
+        String remaining = new String(remainingBytes, StandardCharsets.UTF_8);
+        return remaining.replaceAll("\\p{C}", "").trim();
+    }
+
     private CprData parseCprData(byte[] data) {
         try {
-            String getField(int start, int length) {
-                if (start + length > data.length) return "";
-                byte[] fieldBytes = new byte[length];
-                System.arraycopy(data, start, fieldBytes, 0, length);
-                String field = new String(fieldBytes, StandardCharsets.UTF_8);
-                return field.replaceAll("\\p{C}", "").trim();
-            }
-
-            String getRemainingField(int start) {
-                if (start >= data.length) return "";
-                byte[] remainingBytes = new byte[data.length - start];
-                System.arraycopy(data, start, remainingBytes, 0, remainingBytes.length);
-                String remaining = new String(remainingBytes, StandardCharsets.UTF_8);
-                return remaining.replaceAll("\\p{C}", "").trim();
-            }
-
-            String cprNumber = getField(0, 9);
-            String fullName = getField(9, 50);
-            String remainingData = getRemainingField(59);
+            String cprNumber = getField(data, 0, 9);
+            String fullName = getField(data, 9, 50);
+            String remainingData = getRemainingField(data, 59);
 
             return new CprData(
                 cprNumber.isEmpty() ? "Parse Error" : cprNumber,

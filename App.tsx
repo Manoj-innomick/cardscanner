@@ -32,7 +32,7 @@ function App(): JSX.Element {
     const { CprScanner } = NativeModules;
     const eventEmitter = new NativeEventEmitter(CprScanner);
 
-    CprScanner?.initialize()
+     CprScanner?.resume()
       .then(() => console.log('Scanner initialized'))
       .catch(err => console.error('Init error:', err));
 
@@ -40,6 +40,7 @@ function App(): JSX.Element {
       'ScannerStatus',
       (status: string) => setStatus(status),
     );
+    
 
     const dataListener = eventEmitter.addListener('CprData', (data: CprData) => {
       setCprData(data);

@@ -9,16 +9,15 @@ import com.facebook.react.ReactNativeHost
 import com.facebook.react.ReactPackage
 import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import com.facebook.react.defaults.DefaultReactNativeHost
-import com.smartcardpoc.CprScannerPackage
 
+@Suppress("DEPRECATION") // Suppress deprecation warnings for ReactNativeHost
 class MainApplication : Application(), ReactApplication {
 
   override val reactNativeHost: ReactNativeHost =
       object : DefaultReactNativeHost(this) {
         override fun getPackages(): List<ReactPackage> =
             PackageList(this).packages.apply {
-              // Explicitly cast CprScannerPackage to ReactPackage
-              add(CprScannerPackage() as ReactPackage)
+              // Rely on auto-linking for CprScannerModule; no manual add needed
             }
 
         override fun getJSMainModuleName(): String = "index"
@@ -34,6 +33,7 @@ class MainApplication : Application(), ReactApplication {
 
   override fun onCreate() {
     super.onCreate()
+    // If you are using React Native's new architecture, you can load the native modules here
     loadReactNative(this)
   }
 }
